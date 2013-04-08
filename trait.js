@@ -1,5 +1,20 @@
 // Requires: type.js
 
+function DEBUG() {
+  // print.apply(null, arguments);
+}
+
+///////////////////////////////////////////////////////////////////////////
+
+function Obligation(id, traitReference) {
+  this.id = id;
+  this.traitReference = traitReference;
+}
+
+Obligation.prototype.toString = function() {
+  return "<" + this.id + "@" + this.traitReference + ">";
+};
+
 ///////////////////////////////////////////////////////////////////////////
 
 function TraitReference(id, typeParameters, selfType) {
@@ -33,7 +48,7 @@ TraitReference.prototype.toString = function() {
 
 function TypeParameterDef(bounds) {
   // <T:bounds>
-  this.bounds = bounds;
+  this.bounds = bounds; // TraitReference
 }
 
 TypeParameterDef.prototype.toString = function() {
@@ -58,15 +73,21 @@ function Program(impls) {
 
 ///////////////////////////////////////////////////////////////////////////
 
-function resolve(program, environment, pendingTraitReferences) {
+function resolve(program, environment, obligations0) {
+  // create our own copy of the obligations list, as we will be growing it
+  var obligations = obligations0.slice();
+
   var confirmed = [];
   var deferred = [];
   var errors = [];
 
-  for (var i = 0; i < pendingTraitReferences.length; i++) {
-    var pendingTraitReference = pendingTraitReferences[i];
+  for (var i = 0; i < obligations.length; i++) {
+    var obligation = obligations[i];
+    var pendingTraitReference = obligation.traitReference;
 
-    print("pendingTraitReference", pendingTraitReference);
+    DEBUG("obligation", obligation);
+
+    DEBUG("pendingTraitReference", pendingTraitReference);
 
     // First round. Try to unify types.
     var candidateImpls = program.impls.filter(impl => {
@@ -81,17 +102,20 @@ function resolve(program, environment, pendingTraitReferences) {
     // For better error messages, check now if there is exactly one candidate.
     if (candidateImpls.length == 1) {
       confirmCandidate(
-        environment, candidateImpls[0], pendingTraitReference,
-        confirmed, pendingTraitReferences);
+        environment, candidateImpls[0], obligation,
+        confirmed, obligations);
       continue;
     }
 
     // Second round. Examine other obligations.
     var candidateImplsRound2 = candidateImpls.filter(candidateImpl => {
       return environment.probe(() => {
+        DEBUG("pendingTraitReference", pendingTraitReference,
+              "candidateImpl", candidateImpl);
+
         var candidateDeferred =
           candidateObligations(
-            environment, candidateImpl, pendingTraitReference);
+            environment, candidateImpl, obligation);
         var candidateResult = resolve(program, environment, candidateDeferred);
         return (candidateResult.errors.length == 0);
       });
@@ -99,12 +123,13 @@ function resolve(program, environment, pendingTraitReferences) {
 
     if (candidateImplsRound2.length == 0) {
       // Nothing viable.
-      errors.push(pendingTraitReference);
+      errors.push({obligation: obligation.id,
+                   traitReference: pendingTraitReference});
     } else if (candidateImplsRound2.length == 1) {
       // Exactly one viable.
       confirmCandidate(
-        environment, candidateImplsRound2[0], pendingTraitReference,
-        confirmed, pendingTraitReferences);
+        environment, candidateImplsRound2[0], obligation,
+        confirmed, obligations);
     } else {
       // Multiple still viable.
       deferred.push(pendingTraitReference);
@@ -120,8 +145,8 @@ function instantiateAndUnify(environment, impl, pendingTraitReference) {
   var freshVariables = environment.freshVariables(impl.numVariables);
   var implTraitReference = impl.traitReference.subst(freshVariables);
 
-  print("freshVariables", freshVariables);
-  print("implTraitReference", implTraitReference);
+  DEBUG("freshVariables", freshVariables);
+  DEBUG("implTraitReference", implTraitReference);
 
   if (!environment.unify(implTraitReference.selfType,
                          pendingTraitReference.selfType))
@@ -142,27 +167,28 @@ function instantiateAndUnify(environment, impl, pendingTraitReference) {
   return freshVariables;
 }
 
-function implObligations(impl, replacements) {
+function implObligations(base_id, impl, replacements) {
   var obligations = [];
   impl.parameterDefs.forEach(parameterDef => {
-    parameterDef.bounds.forEach(bound => {
+    parameterDef.bounds.forEach((bound, index) => {
       var bound = bound.subst(replacements);
-      obligations.push(bound);
+      obligations.push(new Obligation(base_id+"."+index, bound));
     });
   });
   return obligations;
 }
 
-function candidateObligations(environment, candidateImpl, traitReference) {
+function candidateObligations(environment, candidateImpl, obligation) {
+  var traitReference = obligation.traitReference;
   var replacements = instantiateAndUnify(environment, candidateImpl, traitReference);
-  return implObligations(candidateImpl, replacements);
+  return implObligations(obligation.id, candidateImpl, replacements);
 }
 
-function confirmCandidate(environment, candidateImpl, traitReference,
-                          confirmed, pendingTraitReferences) {
-  confirmed.push({impl: candidateImpl,
-                  traitReference: traitReference});
-  pendingTraitReferences.push.apply(
-    pendingTraitReferences,
-    candidateObligations(environment, candidateImpl, traitReference));
+function confirmCandidate(environment, candidateImpl, obligation,
+                          confirmed, obligations) {
+  confirmed.push({impl: candidateImpl.id,
+                  obligation: obligation.id})
+  obligations.push.apply(
+    obligations,
+    candidateObligations(environment, candidateImpl, obligation));
 }

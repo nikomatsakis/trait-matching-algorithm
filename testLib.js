@@ -20,28 +20,18 @@ function expectError(func) {
 }
 
 function expectResult(expected, func) {
-  try {
-    var actual = func();
-    if (actual !== expected) {
-      print(testName() + ": unexpected result occurred ("+actual+" vs "+expected+")");
-      TESTS_FAILED++;
-    } else {
-      TESTS_PASSED++;
-    }
-  } catch (e) {
-    print(testName() + ": unexpected error occurred ("+e+")");
+  var actual = func();
+  if (actual !== expected) {
+    print(testName() + ": unexpected result occurred ("+actual+" vs "+expected+")");
     TESTS_FAILED++;
+  } else {
+    TESTS_PASSED++;
   }
 }
 
 function expectSuccess(func) {
-  try {
-    func();
-    TESTS_PASSED++;
-  } catch (e) {
-    print(testName() + ": unexpected error occurred ("+e+")");
-    TESTS_FAILED++;
-  }
+  func();
+  TESTS_PASSED++;
 }
 
 function printSummary() {
