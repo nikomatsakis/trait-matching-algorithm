@@ -1,3 +1,6 @@
+load("testLib.js");
+load("type.js");
+
 (function typesWithDifferentIdsCannotUnify() {
   expectResult(false, function() {
     var env = new Environment();

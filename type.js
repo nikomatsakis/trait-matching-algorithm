@@ -11,32 +11,46 @@ Environment.prototype.freshVariable = function() {
   return new TypeVariable(index);
 };
 
+Environment.prototype.freshVariables = function(number) {
+  var result = [];
+  for (var i = 0; i < number; i++) {
+    result.push(this.freshVariable());
+  }
+  return result;
+};
+
 Environment.prototype.unify = function(type1, type2) {
   // Top-level routine to unify two types
   return type1.unify(this, type2);
 };
 
+Environment.prototype.snapshot = function() {
+  return {numberTypeVariables: this.numberTypeVariables,
+          boundVariablesLength: this.boundVariables.length};
+};
+
 Environment.prototype.attempt = function(closure) {
   // Execute `closure` provisionally; if `closure` returns false,
   // any bindings created will be undone
-  var numBindings = this.boundVariables.length;
+  var snapshot = this.snapshot();
   if (closure())
     return true;
-  this.rollback(numBindings);
+  this.rollback(snapshot);
   return false;
 };
 
 Environment.prototype.probe = function(closure) {
   // Execute `closure` but always undoes any bindings it creates
-  var numBindings = this.boundVariables.length;
+  var snapshot = this.snapshot();
   var result = closure();
-  this.rollback(numBindings);
+  this.rollback(snapshot);
   return result;
 };
 
-Environment.prototype.rollback = function(length) {
+Environment.prototype.rollback = function(snapshot) {
   // Rolls back any bindings that have occurred since `length`
-  while (this.boundVariables.length > length) {
+  this.numberTypeVariables = snapshot.numberTypeVariables;
+  while (this.boundVariables.length > snapshot.boundVariablesLength) {
     var variable = this.boundVariables.pop();
     variable.unbind();
   }
@@ -55,7 +69,7 @@ function Type(id, typeParameters) {
 }
 
 Type.prototype.toString = function() {
-  if (!this.typeParameters)
+  if (this.typeParameters.length === 0)
     return this.id;
 
   var result = this.id + "<";
@@ -91,6 +105,41 @@ Type.prototype.unifyWithType = function(environment, otherType) {
 Type.prototype.unifyWithUnboundTypeVariable = function(environment, variable) {
   return variable.unifyWithType(environment, this);
 }
+
+Type.prototype.resolve = function() {
+  return new Type(this.id, this.typeParameters.map(p => p.resolve()));
+};
+
+Type.prototype.subst = function(replacements) {
+  return new Type(this.id, this.typeParameters.map(p => p.subst(replacements)));
+};
+
+///////////////////////////////////////////////////////////////////////////
+
+function TypeParameter(index) {
+  // P0
+  this.index = index;
+}
+
+TypeParameter.prototype.toString = function() {
+  return "<P"+index+">";
+};
+
+TypeParameter.prototype.unify = function(environment, otherType) {
+  throw new Error("Unsubstituted type parameter: " + this);
+};
+
+TypeParameter.prototype.unifyWithType = function(environment, otherType) {
+  throw new Error("Unsubstituted type parameter: " + this);
+};
+
+TypeParameter.prototype.unifyWithUnboundTypeVariable = function(environment, variable) {
+  throw new Error("Unsubstituted type parameter: " + this);
+};
+
+TypeParameter.prototype.subst = function(replacements) {
+  return replacements[this.index];
+};
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -147,4 +196,8 @@ TypeVariable.prototype.resolve = function() {
 
 TypeVariable.prototype.toString = function() {
   return "<T"+this.index+":"+this.value+">";
+};
+
+TypeVariable.prototype.subst = function(replacements) {
+  throw new Error("Substituting type variable: " + this);
 };

@@ -10,5 +10,5 @@ fi
 for TESTFILE in *Test.js; do
     echo "__________________________________________________"
     echo "Running $TESTFILE:"
-    "$JSENGINE" -f testLib.js -f type.js -f typeTest.js
+    "$JSENGINE" -f "$TESTFILE"
 done
