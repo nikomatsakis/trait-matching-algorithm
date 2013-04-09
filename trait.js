@@ -46,17 +46,6 @@ TraitReference.prototype.toString = function() {
 
 ///////////////////////////////////////////////////////////////////////////
 
-function TypeParameterDef(bounds) {
-  // <T:bounds>
-  this.bounds = bounds; // TraitReference
-}
-
-TypeParameterDef.prototype.toString = function() {
-  return "<"+this.bounds+">";
-};
-
-///////////////////////////////////////////////////////////////////////////
-
 function Impl(id, parameterDefs, traitReference) {
   // impl<V1...Vn> Trait<P0...PN> for Type
   this.id = id; // unique string, line number, whatever
@@ -100,6 +89,9 @@ function resolve(program, environment, obligations0) {
     });
 
     // For better error messages, check now if there is exactly one candidate.
+    // See test `genericImpl` for an example where this makes a difference;
+    // we report an error for failing to find an impl for string, and not
+    // list<string>
     if (candidateImpls.length == 1) {
       confirmCandidate(
         environment, candidateImpls[0], obligation,
@@ -132,7 +124,7 @@ function resolve(program, environment, obligations0) {
         confirmed, obligations);
     } else {
       // Multiple still viable.
-      deferred.push(pendingTraitReference);
+      deferred.push(obligation.id);
     }
   }
 

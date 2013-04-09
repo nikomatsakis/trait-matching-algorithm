@@ -116,8 +116,20 @@ Type.prototype.subst = function(replacements) {
 
 ///////////////////////////////////////////////////////////////////////////
 
+function TypeParameterDef(index, bounds) {
+  // <Pn:bounds>
+  this.index = index;
+  this.bounds = bounds; // TraitReference
+}
+
+TypeParameterDef.prototype.toString = function() {
+  return "<P" + this.index + ":" + this.bounds + ">";
+};
+
+///////////////////////////////////////////////////////////////////////////
+
 function TypeParameter(index) {
-  // P0
+  // Pn
   this.index = index;
 }
 
