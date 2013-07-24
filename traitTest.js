@@ -147,7 +147,6 @@ load("trait.js");
   })
 })();
 
-
 (function insufficientTypeInformation() {
   // In this test, there are two impls and a type variable,
   // we can infer nothing about the value of the type variable
@@ -213,27 +212,31 @@ load("trait.js");
 })();
 
 (function iteratorInference() {
+  // In this test, we have a type List<int> that needs to implement
+  // Iterable<V0>.  Because there is only one impl of Iterable for List,
+  // we are able to infer that V0 is int.
   expectSuccess(function() {
     var env = new Environment();
 
     var intType = new Type("int", []);
     var listType = t => new Type("list", [t]);
+    var arrayType = t => new Type("array", [t]);
     var varType = env.freshVariable();
     var p0Type = new TypeParameter(0);
-    var p0Def = new TypeParameterDef(0, [new TraitReference("Iterable", [], p0Type)]);
+    var p0Def = new TypeParameterDef(0, []);
 
     var program = new Program([
-      new Impl("IterableInt", [], new TraitReference("Iterable", [], intType)),
-      new Impl("IterableList", [p0Def], new TraitReference("Iterable", [], listType(p0Type)))
+      new Impl("IterableList", [p0Def], new TraitReference("Iterable", [p0Type], listType(p0Type))),
+      new Impl("IterableArray", [p0Def], new TraitReference("Iterable", [p0Type], arrayType(p0Type)))
     ]);
 
     var result =
       resolve(program, env, [
-        new Obligation("A", new TraitReference("Iterable", [], varType))
+        new Obligation("A", new TraitReference("Iterable", [varType], listType(intType)))
       ]);
 
     var expectedResult = {
-      confirmed: [{impl: "IterableInt", obligation: "A"}],
+      confirmed: [{impl: "IterableList", obligation: "A"}],
       deferred: [],
       errors: []
     };
@@ -242,6 +245,42 @@ load("trait.js");
              JSON.stringify(expectedResult, undefined, 2));
     assertEq(JSON.stringify(varType.resolve()),
              JSON.stringify(intType));
+  })
+})();
+
+(function ambigInference() {
+  // In this test, we require that str implements Iterable<V0>, but
+  // because str implements both Iterable<char> and Iterable<u8> we
+  // are not able to infer the type of V0.
+  expectSuccess(function() {
+    var env = new Environment();
+
+    var u8Type = new Type("u8", []);
+    var charType = new Type("char", []);
+    var strType = new Type("str", []);
+    var varType = env.freshVariable();
+    var p0Type = new TypeParameter(0);
+    var p0Def = new TypeParameterDef(0, []);
+
+    var program = new Program([
+      new Impl("IterableChar", [], new TraitReference("Iterable", [charType], strType)),
+      new Impl("IterableByte", [], new TraitReference("Iterable", [u8Type], strType)),
+    ]);
+
+    var result =
+      resolve(program, env, [
+        new Obligation("A", new TraitReference("Iterable", [varType], strType))
+      ]);
+
+    var expectedResult = {
+      confirmed: [],
+      deferred: ["A"],
+      errors: []
+    };
+
+    assertEq(JSON.stringify(result, undefined, 2),
+             JSON.stringify(expectedResult, undefined, 2));
+    assertEq(varType.isBound, false);
   })
 })();
 
