@@ -1,9 +1,10 @@
 ///////////////////////////////////////////////////////////////////////////
 // A simple unification-style inference engine
 
-function Environment() {
+function Environment(typeParameterDefs) {
   this.numberTypeVariables = 0;
   this.boundVariables = [];
+  this.typeParameterDefs = typeParameterDefs || [];
 }
 
 Environment.prototype.freshVariable = function() {
@@ -13,9 +14,8 @@ Environment.prototype.freshVariable = function() {
 
 Environment.prototype.freshVariables = function(number) {
   var result = [];
-  for (var i = 0; i < number; i++) {
+  for (var i = 0; i < number; i++)
     result.push(this.freshVariable());
-  }
   return result;
 };
 
@@ -23,6 +23,22 @@ Environment.prototype.unify = function(type1, type2) {
   // Top-level routine to unify two types
   return type1.unify(this, type2);
 };
+
+Environment.prototype.unifyTraitReferences = function(traitRef1, traitRef2) {
+  if (!this.unify(traitRef1.selfType, traitRef2.selfType))
+    return false;
+
+  var numTypeParameters = traitRef1.typeParameters.length;
+  if (numTypeParameters != traitRef2.typeParameters.length)
+    throw new Error("Inconsistent number of type parameters: " +
+                    traitRef1 + " vs " + traitRef2);
+
+  for (var k = 0; k < numTypeParameters; k++)
+    if (!this.unify(traitRef1.typeParameters[k], traitRef2.typeParameters[k]))
+      return false;
+
+  return true;
+}
 
 Environment.prototype.snapshot = function() {
   return {numberTypeVariables: this.numberTypeVariables,
@@ -118,6 +134,7 @@ Type.prototype.subst = function(replacements) {
 
 function TypeParameterDef(index, bounds) {
   // <Pn:bounds>
+  assertEq(true, bounds !== undefined);
   this.index = index;
   this.bounds = bounds; // TraitReference
 }
@@ -134,7 +151,7 @@ function TypeParameter(index) {
 }
 
 TypeParameter.prototype.toString = function() {
-  return "<P"+index+">";
+  return "<P"+this.index+">";
 };
 
 TypeParameter.prototype.unify = function(environment, otherType) {
@@ -203,7 +220,7 @@ TypeVariable.prototype.isBound = function() {
 TypeVariable.prototype.resolve = function() {
   if (!this.value)
     throw new Error("Unbound type variable " + this.toString());
-  return this.value;
+  return this.value.resolve();
 };
 
 TypeVariable.prototype.toString = function() {
