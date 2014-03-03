@@ -5,10 +5,26 @@ function DEBUG() {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// An Obligation indicates a trait reference that must be resolved to
+// an impl. So, for example, if the user uses calls `show(x)` where
+// `x` is an `int` and `show` has the type `<T:Show> fn(T)` then this
+// will entail an obligation `Show for int` (actually `Show for int @
+// 0`, which includes a depth, see below).
 
 function Obligation(id, traitReference, depth) {
+  // `id`: A unique identifier for this obligation. Primarily for
+  // debugging, but also used to communicate results from the trait
+  // resolution algorithm.
   this.id = id;
+
+  // `traitReference`: The trait reference that we must resolve to
+  // an impl. For example, `Show for Int`.
   this.traitReference = traitReference;
+
+  // `depth`: Track the depth of the obligation resolution stack. If
+  // resolving this obligation entails further obligations, they will
+  // have an increased depth -- if the depth gets too deep, we give
+  // up.  This is needed because trait resolution is not decidable.
   this.depth = depth;
 }
 
@@ -17,10 +33,12 @@ Obligation.prototype.toString = function() {
 };
 
 ///////////////////////////////////////////////////////////////////////////
+// A trait reference is the combination of a trait with the values of
+// its type parameters (e.g., `Iterable<int> for Vec<int>`).
 
 function TraitReference(id, typeParameters, selfType) {
   // Trait<P0...PN> for Type
-  this.id = id; // string
+  this.id = id; // trait name, a string
   this.selfType = selfType; // Type
   this.typeParameters = typeParameters; // [Type]
 }
@@ -73,6 +91,62 @@ function Program(impls) {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// resolve(P, E, O) -- the main resolve algorithm. Takes a program P,
+// a unification/typing environment E, and a list of obligations
+// O. Attempts to resolve each obligation in O to an impl. This may in
+// turn create other obligations that must be resolved. For example,
+// given the obligation `O0: Bar for int @ 0` and `I0: impl<T:Foo> Bar
+// for T`, we might confirm the impl `I0` for `O0`, but creates a new
+// obligation `O0.0: Foo for int @ 1`. Note that the depth of this
+// nested obligation is increased, and the `id` is modified to have a
+// `.0` appended.
+//
+// Returns four lists:
+//
+// - `confirmed: [{impl: <impl-id>, obligation: <obligation-id>}]` A
+//   list of obligations that were definitely mapped to an impl.
+//
+// - `deferred: [<obligation-id>]` A list of obligations where we could
+//   not resolve to a particular impl nor rule out that an impl may exist.
+//   This can occur because of unresolved inference variables.
+//
+// - `overflow: [{obligation: <obligation-id>}]` A list of obligations
+//   where the depth became too high. Increasing the maximum depth may
+//   permit these obligations to be resolved.
+//
+// - `noImpl: [{obligation: <obligation-id>, traitReference: <trait-ref>}]`
+//   A list of trait references for which we can definitely say no impl
+//   exists. This is possible because of coherence rules and our closed
+//   world assumption.
+//
+// The general algorithm is *basically* a DFS:
+// - We start out with our base list of obligations.
+// - We iterate over this list:
+//   - For each obligation, we will try to narrow down the set of
+//     impls to exactly one that might possibly apply:
+//     - First, we determine the set of impls whose types can be
+//       unified with the types in the obligation.
+//     - If this set has size 1, we're done. Look below to the confirm step.
+//     - Otherwise, we rule out those impls in the set where we can
+//       determine that a recursive bound cannot apply.
+//     - If this set has size 1, we're done. Look below to the confirm step.
+//     - If this set has size > 1, we do not yet have sufficient type
+//       information, so we mark the obligation as DEFERRED and move
+//       on to the next.
+//     - If this set has size 0, it's possible that this impl cannot ever
+//       be resolved. To determine this, we check whether the types have
+//       any unresolved inference variables:
+//       - If they do, then the obligation is DEFERRED. After all,
+//         it's possible that another crate could come along,
+//         implement a new type and then impl any required traits for
+//         it, and that would be the value the for those inference
+//         variables.
+//       - Otherwise, the impl is marked as NO_IMPL.
+//     - Confirmation: if at any point we reached a set of viable impls
+//       of size 1, we mark the obligation as CONFIRMED and push any
+//       nested obligations onto our list of obligations to resolve.
+// - The algorithm terminates when everything on the obligations list
+//   has been processed.
 
 MAX_OBLIGATION_DEPTH = 4 // prevent overflow
 
@@ -119,7 +193,9 @@ function resolve(program, environment, obligations0) {
       continue;
     }
 
-    // Second round. Examine nested obligations.
+    // Second round. Multiple (or zero) unifiable candidate impls
+    // exist. Examine nested obligations recursively and remove any
+    // for which the nested obligations cannot be met.
     var candidateImplsRound2 = candidateImpls.filter(candidateImpl => {
       return environment.probe(() => {
         DEBUG("pendingTraitReference", pendingTraitReference,
@@ -170,6 +246,16 @@ function resolve(program, environment, obligations0) {
 }
 
 function instantiateAndUnify(environment, impl, pendingTraitReference) {
+  // instantiateAndUnify(E, I, T) -- Given an impl definition and a
+  // trait reference:
+  //
+  //    I = impl<A...> Trait<TypeP...> for TypeS
+  //    T = Trait<TypeQ...> for TypeT
+  //
+  // Returns either null or a substitution Theta such that
+  //
+  //    Theta TypeP == TypeQ && Theta TypeS == TypeT
+
   var freshVariables = environment.freshVariables(impl.numVariables);
   var implTraitReference = impl.traitReference.subst(freshVariables);
 
@@ -184,6 +270,10 @@ function instantiateAndUnify(environment, impl, pendingTraitReference) {
 }
 
 function implObligations(base_id, depth, impl, replacements) {
+  // Returns the nested obligations implied by `impl` using the
+  // substitution `replacements`. The id and depth for these new
+  // obligations will be derived from `base_id` and `depth`.
+
   var obligations = [];
   impl.parameterDefs.forEach(parameterDef => {
     parameterDef.bounds.forEach((bound, index) => {
@@ -195,6 +285,17 @@ function implObligations(base_id, depth, impl, replacements) {
 }
 
 function candidateObligations(environment, candidateImpl, obligation) {
+  // candidateImpl(E, I, O) -- Given an environment E, impl I, and obligation O:
+  //
+  //    I = impl<A: Trait1<..>, ...> Trait<TypeP...> for TypeS
+  //    O = id @ Trait<TypeQ, ...> for TypeT @ depth
+  //
+  // which are known to be unifiable (see `instantiateAndUnify()`),
+  // instantiates the bounds like `Trait1<..>` that appear on the
+  // impl's return parameters. Hence in this case it might return:
+  //
+  //    [id.0 @ Trait1<..> for TypeQ, ...]
+
   var traitReference = obligation.traitReference;
   var replacements = instantiateAndUnify(environment, candidateImpl, traitReference);
   return implObligations(obligation.id, obligation.depth+1,
@@ -203,6 +304,16 @@ function candidateObligations(environment, candidateImpl, obligation) {
 
 function confirmCandidate(environment, candidateImpl, obligation,
                           confirmed, obligations) {
+  // This function is called when the resolve process has been able
+  // narrow down the set of viable impls to exactly one. Note that we
+  // do not necessarily yet know if the nested obligations entailed by
+  // this impl can be resolved. All we can say is that if this impl
+  // doesn't work, no other impl will.
+  //
+  // This process then pushes the impl-obligation pair onto the `confirmed`
+  // list and then pushes any nested obligations onto the list `obligations`
+  // to be recursively processed.
+
   confirmed.push({impl: candidateImpl.id,
                   obligation: obligation.id})
   obligations.push.apply(
