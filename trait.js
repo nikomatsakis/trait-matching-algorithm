@@ -31,6 +31,14 @@ Trait.prototype.freshReference = function(env, selfType) {
   return new TraitReference(this.id, parameters, selfType);
 };
 
+Trait.prototype.hasMethodNamed = function(name) {
+  return this.methods.filter(p => p.id === name).length !== 0;
+};
+
+Trait.prototype.methodNamed = function(name) {
+  return this.methods.filter(p => p.id === name)[0];
+};
+
 ///////////////////////////////////////////////////////////////////////////
 // Method -- definition of a method. For our purposes, we only care about
 // the name and explicit self decl.
