@@ -230,7 +230,9 @@ TypeVariable.prototype.resolve = function() {
 };
 
 TypeVariable.prototype.toString = function() {
-  return "<T"+this.index+":"+this.value+">";
+  if (!this.value)
+    return "${"+this.index+"}";
+  return "${"+this.index+":"+this.value+"}";
 };
 
 TypeVariable.prototype.subst = function(replacements) {

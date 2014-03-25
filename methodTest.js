@@ -17,6 +17,16 @@ function setup() {
   var A = new TypeParameter(0);
   var ADef = new TypeParameterDef(0, []);
 
+  // impl<A> Deref<A> for Ref<A>
+  var ImplDerefForRef = new Impl(
+    "DerefForRef", [ADef],
+    new TraitReference(DEREF_TRAIT.id, [A], Ref(A)));
+
+  // impl<A> Deref<A> for RefMut<A>
+  var ImplDerefForRefMut = new Impl(
+    "DerefForRefMut", [ADef],
+    new TraitReference(DEREF_TRAIT.id, [A], RefMut(A)));
+
   // impl<A> Deref<A> for Heap<A>
   var ImplDerefForHeap = new Impl(
     "DerefForHeap", [ADef],
@@ -32,6 +42,11 @@ function setup() {
     "DerefMutForHeap", [ADef],
     new TraitReference(DEREF_MUT_TRAIT.id, [A], Heap(A)));
 
+  // impl<A> DerefMut<A> for RefMut<A>
+  var ImplDerefMutForRefMut = new Impl(
+    "DerefMutForRefMut", [ADef],
+    new TraitReference(DEREF_MUT_TRAIT.id, [A], RefMut(A)));
+
   // trait Test {
   //   fn val(Self);
   //   fn ref(&Self);
@@ -42,6 +57,7 @@ function setup() {
   var TestTrait = new Trait("Test", [true], [
     new Method("val", TestSelf),
     new Method("ref", Ref(TestSelf)),
+    new Method("ref_mut", RefMut(TestSelf)),
     new Method("heap", Heap(TestSelf)),
     new Method("gc", Gc(TestSelf)),
   ]);
@@ -59,8 +75,9 @@ function setup() {
       "Test"
     ],
     [
-      ImplDerefForHeap, ImplDerefForGc,
-      ImplDerefMutForHeap,
+      ImplDerefForHeap, ImplDerefForGc, ImplDerefForGc,
+      ImplDerefForRef, ImplDerefForRefMut,
+      ImplDerefMutForHeap, ImplDerefMutForRefMut,
       ImplTestForInt
     ]);
 
@@ -71,11 +88,32 @@ function setup() {
           TestTrait: TestTrait};
 }
 
-(function basicSearch() {
+(function byValueInt() {
   expectSuccess(function() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, int, [TestTrait], "val");
-    print("Result: ", r);
+    assertEq(r.success, true);
+    assertEq(r.adjustedType.toString(), "NoAdjustment(int)");
+  });
+})();
+
+(function byValueRefInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Heap} = setup();
+    var r = resolveMethod(program, env, Ref(int), [TestTrait], "val");
+    assertEq(r.success, true);
+    assertEq(r.adjustedType.toString(),
+             "DerefAdjustment(NoAdjustment(Ref<int>), Deref -> ${0:int})");
+  });
+})();
+
+print("--------------------------------------------------");
+
+(function byValueRefInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Heap} = setup();
+    var r = resolveMethod(program, env, Ref(int), [TestTrait], "ref");
+    print(r);
   });
 })();
 

@@ -46,8 +46,7 @@ function DerefAdjustment(type, baseAdjustment, traitName, resolveResults) {
 DerefAdjustment.prototype.toString = function() {
   return "DerefAdjustment(" +
     this.baseAdjustment + ", " +
-    this.traitName + ", " +
-    this.implId + " -> " +
+    this.traitName + " -> " +
     this.type + ")";
 };
 
@@ -191,5 +190,5 @@ function derefAdjustment(program, env, adjustedType, traits) {
 
   // NB -- Again here, given fundeps, coherence guarantees us a unique impl
   var derefdType = traitRef.typeParameters[0];
-  return new DerefAdjustment(derefdType, adjustedType, DEREF_TRAIT, results);
+  return new DerefAdjustment(derefdType, adjustedType, DEREF_TRAIT.id, results);
 }
