@@ -1,7 +1,43 @@
+// The base trait resolution algorithm.
+//
 // Requires: type.js
 
 function DEBUG() {
-  // print.apply(null, arguments);
+  print.apply(null, arguments);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Trait -- definition of a trait. For our purposes, we only care about
+// the name, arity, and list of methods.
+//
+// NB: The implicit `Self` type parameter is considered to be #arity.
+// In other words, if we have: `trait Foo<A,B>` then parameter 0 is A,
+// parameter 1 is B, and parameter 2 is Self.
+
+function Trait(id, fundeps, methods) {
+  this.id = id; // trait name, a string
+  this.fundeps = fundeps; // [bool] -> true if type parameter is an IN parameter
+  this.arity = fundeps.length; // number of type parameters
+  this.methods = methods; // [Method]
+}
+
+Trait.prototype.param_is_input = function(i) {
+  // True if param #i is an "input"
+  return this.fundeps[i];
+};
+
+Trait.prototype.freshReference = function(env, selfType) {
+  var parameters = env.freshVariables(this.arity - 1);
+  return new TraitReference(this.id, parameters, selfType);
+};
+
+///////////////////////////////////////////////////////////////////////////
+// Method -- definition of a method. For our purposes, we only care about
+// the name and explicit self decl.
+
+function Method(id, selfType) {
+  this.id = id;
+  this.selfType = selfType; // Type referencing the `Self` type parameter
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -68,9 +104,9 @@ TraitReference.prototype.isFullyBound = function() {
 
 TraitReference.prototype.toString = function() {
   if (this.typeParameters.length > 0) {
-    return this.id+"<self="+this.selfType+",tps="+this.typeParameters+">";
+    return this.id+"<"+this.typeParameters+" for "+this.selfType+">";
   } else {
-    return this.id+"<self="+this.selfType+">";
+    return this.id+"<for "+this.selfType+">";
   }
 };
 
@@ -86,8 +122,9 @@ function Impl(id, parameterDefs, traitReference) {
 
 ///////////////////////////////////////////////////////////////////////////
 
-function Program(impls) {
-  this.impls = impls // [Impl]
+function Program(traits,impls) {
+  this.traits = traits; // [Trait]
+  this.impls = impls;   // [Impl]
 }
 
 ///////////////////////////////////////////////////////////////////////////

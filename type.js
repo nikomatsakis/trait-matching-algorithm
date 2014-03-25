@@ -130,7 +130,13 @@ Type.prototype.subst = function(replacements) {
   return new Type(this.id, this.typeParameters.map(p => p.subst(replacements)));
 };
 
+Type.prototype.meetsNominalPredicate = function(predicate) {
+  return predicate(this.id);
+};
+
 ///////////////////////////////////////////////////////////////////////////
+
+var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 function TypeParameterDef(index, bounds) {
   // <Pn:bounds>
@@ -140,7 +146,7 @@ function TypeParameterDef(index, bounds) {
 }
 
 TypeParameterDef.prototype.toString = function() {
-  return "<P" + this.index + ":" + this.bounds + ">";
+  return "<" + ALPHABET[this.index] + ":" + this.bounds + ">";
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -151,7 +157,7 @@ function TypeParameter(index) {
 }
 
 TypeParameter.prototype.toString = function() {
-  return "<P"+this.index+">";
+  return ALPHABET[this.index];
 };
 
 TypeParameter.prototype.unify = function(environment, otherType) {
@@ -230,3 +236,10 @@ TypeVariable.prototype.toString = function() {
 TypeVariable.prototype.subst = function(replacements) {
   throw new Error("Substituting type variable: " + this);
 };
+
+TypeVariable.prototype.meetsNominalPredicate = function(predicate) {
+  if (!this.value)
+    return false;
+  return tihs.value.meetsNominalPredicate(predicate);
+};
+
