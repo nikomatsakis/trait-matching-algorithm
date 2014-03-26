@@ -26,36 +26,14 @@ load("trait.js");
 
     var expectedResult =
       {
-        "confirmed": [
-          {
-            "impl": "ToStrInt",
-            "obligation": "ToStr/int"
-          },
-          {
-            "impl": "ToStrFloat",
-            "obligation": "ToStr/float"
-          }
-        ],
+        "confirmed": ["ToStr/int -> ToStrInt<>",
+                      "ToStr/float -> ToStrFloat<>"],
         "deferred": [],
-        overflow: [],
-        "noImpl": [
-          {
-            "obligation": "ToStr/str",
-            "traitReference": {
-              "id": "ToStr",
-              "selfType": {
-                "id": "foo",
-                "typeParameters": []
-              },
-              "typeParameters": []
-            }
-          }
-        ]
+        "overflow": [],
+        "noImpl": ["ToStr/str"]
       };
 
-    DEBUG(JSON.stringify(result, undefined, 2));
-    assertEq(JSON.stringify(expectedResult, undefined, 2),
-             JSON.stringify(result, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
   });
 })();
 
@@ -86,42 +64,15 @@ load("trait.js");
       ]);
 
     var expectedResult = {
-      "confirmed": [
-        {
-          "impl": "ToStrList",
-          "obligation": "ToStr(List<int>)"
-        },
-        {
-          "impl": "ToStrList",
-          "obligation": "ToStr(List<foo>)"
-        },
-        {
-          "impl": "ToStrInt",
-          "obligation": "ToStr(List<int>).0"
-        }
-      ],
+      "confirmed": ["ToStr(List<int>) -> ToStrList<${0:int}>",
+                    "ToStr(List<foo>) -> ToStrList<${1:foo}>",
+                    "ToStr(List<int>).0 -> ToStrInt<>"],
       "deferred": [],
       "overflow": [],
-      "noImpl": [
-        {
-          "obligation": "ToStr(List<foo>).0",
-          "traitReference": {
-            "id": "ToStr",
-            "selfType": {
-              "index": 1,
-              "value": {
-                "id": "foo",
-                "typeParameters": []
-              }
-            },
-            "typeParameters": []
-          }
-        }
-      ]
+      "noImpl": ["ToStr(List<foo>).0"]
     };
 
-    assertEq(JSON.stringify(expectedResult, undefined, 2),
-             JSON.stringify(result, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
   })
 })();
 
@@ -151,15 +102,13 @@ load("trait.js");
       ]);
 
     var expectedResult =  {
-      "confirmed": [{impl: "ToStr",
-                     obligation: "ToStr(List<V0>)"}],
+      "confirmed": ["ToStr(List<V0>) -> ToStr<${1:${0}}>"],
       "deferred": ["ToStr(List<V0>).0"],
       "overflow": [],
       "noImpl": []
     };
 
-    assertEq(JSON.stringify(expectedResult, undefined, 2),
-             JSON.stringify(result, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
   })
 })();
 

@@ -136,6 +136,27 @@ function Program(traits,impls) {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+
+function ResolveResult(confirmed, deferred, overflow, noImpl) {
+  this.confirmed = confirmed;
+  this.deferred = deferred;
+  this.overflow = overflow;
+  this.noImpl = noImpl;
+}
+
+ResolveResult.prototype = {
+  toString: function() {
+    return JSON.stringify({
+      confirmed: this.confirmed.map(
+        c => c.obligation.id + " -> " + c.impl + "<" + c.replacements + ">"),
+      deferred: this.deferred.map(o => o.id),
+      overflow: this.overflow.map(o => o.id),
+      noImpl: this.noImpl.map(o => o.id)
+    });
+  }
+};
+
+///////////////////////////////////////////////////////////////////////////
 // resolve(P, E, O) -- the main resolve algorithm. Takes a program P,
 // a unification/typing environment E, and a list of obligations
 // O. Attempts to resolve each obligation in O to an impl. This may in
@@ -151,15 +172,15 @@ function Program(traits,impls) {
 // - `confirmed: [{impl: <impl-id>, obligation: <obligation-id>}]` A
 //   list of obligations that were definitely mapped to an impl.
 //
-// - `deferred: [<obligation-id>]` A list of obligations where we could
+// - `deferred: [obligation]` A list of obligations where we could
 //   not resolve to a particular impl nor rule out that an impl may exist.
 //   This can occur because of unresolved inference variables.
 //
-// - `overflow: [{obligation: <obligation-id>}]` A list of obligations
+// - `overflow: [obligation]` A list of obligations
 //   where the depth became too high. Increasing the maximum depth may
 //   permit these obligations to be resolved.
 //
-// - `noImpl: [{obligation: <obligation-id>, traitReference: <trait-ref>}]`
+// - `noImpl: [obligation]`
 //   A list of trait references for which we can definitely say no impl
 //   exists. This is possible because of coherence rules and our closed
 //   world assumption.
@@ -213,7 +234,7 @@ function resolve(program, environment, obligations0) {
     DEBUG("pendingTraitReference", pendingTraitReference);
 
     if (obligation.depth > MAX_OBLIGATION_DEPTH) {
-      overflow.push({obligation: obligation.id});
+      overflow.push(obligation);
       continue;
     }
 
@@ -246,7 +267,7 @@ function resolve(program, environment, obligations0) {
         DEBUG("pendingTraitReference", pendingTraitReference,
               "candidateImpl", candidateImpl);
 
-        var candidateDeferred =
+        var [candidateDeferred, _] =
           candidateObligations(
             environment, candidateImpl, obligation);
         var candidateResult = resolve(program, environment, candidateDeferred);
@@ -277,17 +298,13 @@ function resolve(program, environment, obligations0) {
 
       if (candidateImplsRound2.length == 0 &&
           obligation.traitReference.isFullyBound())
-        noImpl.push({obligation: obligation.id,
-                     traitReference: pendingTraitReference});
+        noImpl.push(obligation);
       else
-        deferred.push(obligation.id);
+        deferred.push(obligation);
     }
   }
 
-  return {confirmed: confirmed,
-          deferred: deferred,
-          overflow: overflow,
-          noImpl: noImpl};
+  return new ResolveResult(confirmed, deferred, overflow, noImpl);
 }
 
 function instantiateAndUnify(environment, impl, pendingTraitReference) {
@@ -343,8 +360,9 @@ function candidateObligations(environment, candidateImpl, obligation) {
 
   var traitReference = obligation.traitReference;
   var replacements = instantiateAndUnify(environment, candidateImpl, traitReference);
-  return implObligations(obligation.id, obligation.depth+1,
-                         candidateImpl, replacements);
+  return [implObligations(obligation.id, obligation.depth+1,
+                          candidateImpl, replacements),
+          replacements];
 }
 
 function confirmCandidate(environment, candidateImpl, obligation,
@@ -359,9 +377,10 @@ function confirmCandidate(environment, candidateImpl, obligation,
   // list and then pushes any nested obligations onto the list `obligations`
   // to be recursively processed.
 
+  var [newObligations, replacements] =
+    candidateObligations(environment, candidateImpl, obligation);
   confirmed.push({impl: candidateImpl.id,
-                  obligation: obligation.id})
-  obligations.push.apply(
-    obligations,
-    candidateObligations(environment, candidateImpl, obligation));
+                  replacements: replacements,
+                  obligation: obligation})
+  obligations.push.apply(obligations, newObligations);
 }
