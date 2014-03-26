@@ -37,13 +37,16 @@ DerefAdjustment.prototype.toString = function() {
   return "DerefAdjustment(" + this.traitName + ")";
 };
 
-function RefAdjustment(mutability) {
-  this.baseAdjustment = baseAdjustment;
-  this.mutability = mutability;
-}
+RefAdjustment = {
+  toString: function() {
+    return "RefAdjustment()";
+  }
+};
 
-RefAdjustment.prototype.toString = function() {
-  return "RefAdjustment(" + this.mutability + ")";
+RefMutAdjustment = {
+  toString: function() {
+    return "RefMutAdjustment()";
+  }
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -51,10 +54,11 @@ RefAdjustment.prototype.toString = function() {
 
 function CannotDeref(type) {
   this.type = type;
-  this.success = false;
 }
 
 CannotDeref.prototype = {
+  success: false,
+
   toString: function() {
     return "CannotDeref(" + this.type + ")";
   }
@@ -62,26 +66,34 @@ CannotDeref.prototype = {
 
 function Ambiguous(applicableTraits) {
   this.applicableTraits = applicableTraits;
-  this.success = false;
 }
 
 Ambiguous.prototype = {
+  success: false,
+
   toString: function() {
     return "Ambiguous(" + this.applicableTraits + ")";
   }
 };
 
-function Match(traitRef, adjustments, confirmed, deferred, overflow) {
-  print("Match", "adjustments", adjustments);
-  this.adjustments = adjustments;
+function Match(traitRef, adjustments, results) {
   this.traitRef = traitRef;
-  this.confirmed = confirmed;
-  this.deferred = deferred;
-  this.overflow = overflow;
-  this.success = true;
+  this.adjustments = to_array(adjustments);
+  this.results = results;
+
+  function to_array(conslist) {
+    var x = [];
+    while (conslist) {
+      x.push(conslist[0]);
+      conslist = conslist[1];
+    }
+    return x;
+  }
 }
 
 Match.prototype = {
+  success: true,
+
   toString: function() {
     return "Match(" + this.adjustments + ", " + this.traitRef + ")";
   }
@@ -102,15 +114,6 @@ function MethodContext(program, env, traits, methodName) {
   this.env = env;
   this.traits = traits;
   this.methodName = methodName;
-}
-
-function to_array(conslist) {
-  var x = [];
-  while (conslist) {
-    x.push(conslist[0]);
-    conslist = conslist[1];
-  }
-  return x;
 }
 
 MethodContext.prototype = {
@@ -148,9 +151,7 @@ MethodContext.prototype = {
     assertEq(results.noImpl.length, 0);
 
     // Now we must reconcile against the self type.
-    var adjustments1 = to_array(adjustments);
-    return new Match(traitRef, adjustments1, results.confirmed,
-                     results.deferred, results.overflow);
+    return new Match(traitRef, adjustments, results);
   },
 
   resolveAfterDeref: function(types, adjustments) {
@@ -195,15 +196,29 @@ MethodContext.prototype = {
     return [derefdType, new DerefAdjustment(DEREF_TRAIT.id, derefdType)];
   },
 
-  reconcileSelfType: function(adjustedType, methodDecl, traitRef) {
-    print("reconcileSelfType", adjustedType, methodDecl, traitRef);
+  reconcileSelfType: function(adjustments, types, methodDecl, traitRef, results) {
+    print("reconcileSelfType", adjustments, types, methodDecl, traitRef);
     var selfType = methodDecl.selfType.subst(traitRef.typeParameters);
     print("selfType", selfType);
 
-    for (var adj = adjustedType; adj != null; adj = adj.baseAdjustment) {
-      if (env.attempt(() => adj.type.unify(selfType))) {
-        return Match
-      }
+    // Check whether the type T works; if so, we know what adjustments
+    // were needed.
+    if (env.attempt(() => selfType.unify(types[0])))
+      return new Match(traitRef, adjustments, results);
+
+    // Attempt an &ref.
+    var refType = Ref(types[0]);
+    if (env.attempt(() => selfType.unify(refType)))
+      return new Match(traitRef, [RefAdjustment, adjustments], results);
+
+    // Attempt an &mut ref.
+    var refMutType = RefMut(types[0]);
+    if (env.attempt(() => selfType.unify(refMutType))) {
+      var mutAdjustments = this.makeMutable(adjustments);
+      return new Match(traitRef, [RefMutAdjustment, mutAdjustments], results);
     }
   },
+
+  makeMutable: function(adjustments, types) {
+  }
 };

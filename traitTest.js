@@ -10,10 +10,12 @@ load("trait.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrFloat", [], new TraitReference("ToStr", [], floatType))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrFloat", [], new TraitReference("ToStr", [], floatType))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -70,10 +72,12 @@ load("trait.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrList", [p0Def], new TraitReference("ToStr", [], listType(p0Type)))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrList", [p0Def], new TraitReference("ToStr", [], listType(p0Type)))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -135,9 +139,11 @@ load("trait.js");
     var TType = new TypeParameter(0);
     var TDef = new TypeParameterDef(0, [new TraitReference("Foo", [], TType)]);
 
-    var program = new Program([
-      new Impl("ToStr", [TDef], new TraitReference("ToStr", [], listType(TType)))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStr", [TDef], new TraitReference("ToStr", [], listType(TType)))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -165,10 +171,12 @@ load("trait.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -197,10 +205,12 @@ load("trait.js");
     var floatType = new Type("float", []);
     var varType = env.freshVariable();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrFloat", [], new TraitReference("ToStr", [], floatType))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrFloat", [], new TraitReference("ToStr", [], floatType))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -230,9 +240,11 @@ load("trait.js");
     var intType = new Type("int", []);
     var varType = env.freshVariable();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+      ]);
 
     var result =
       resolve(program, env, [
@@ -267,10 +279,12 @@ load("trait.js");
     var p0Type = new TypeParameter(0);
     var p0Def = new TypeParameterDef(0, []);
 
-    var program = new Program([
-      new Impl("IterableList", [p0Def], new TraitReference("Iterable", [p0Type], listType(p0Type))),
-      new Impl("IterableArray", [p0Def], new TraitReference("Iterable", [p0Type], arrayType(p0Type)))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("IterableList", [p0Def], new TraitReference("Iterable", [p0Type], listType(p0Type))),
+        new Impl("IterableArray", [p0Def], new TraitReference("Iterable", [p0Type], arrayType(p0Type)))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -305,10 +319,12 @@ load("trait.js");
     var p0Type = new TypeParameter(0);
     var p0Def = new TypeParameterDef(0, []);
 
-    var program = new Program([
-      new Impl("IterableChar", [], new TraitReference("Iterable", [charType], strType)),
-      new Impl("IterableByte", [], new TraitReference("Iterable", [u8Type], strType)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("IterableChar", [], new TraitReference("Iterable", [charType], strType)),
+        new Impl("IterableByte", [], new TraitReference("Iterable", [u8Type], strType)),
+      ]);
 
     var result =
       resolve(program, env, [
@@ -342,9 +358,11 @@ load("trait.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStr", [p0Def], new TraitReference("ToStr", [], p0Type))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStr", [p0Def], new TraitReference("ToStr", [], p0Type))
+      ]);
 
     var result =
       resolve(program, env, [
@@ -390,10 +408,12 @@ load("trait.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStr", [pTDef], new TraitReference("X", [], pTType)),
-      new Impl("ToStr", [pUDef], new TraitReference("Y", [], pUType))
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStr", [pTDef], new TraitReference("X", [], pTType)),
+        new Impl("ToStr", [pUDef], new TraitReference("Y", [], pUType))
+      ]);
 
     var result =
       resolve(program, env, [

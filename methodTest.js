@@ -109,13 +109,12 @@ function setup() {
   });
 })();
 
-print("--------------------------------------------------");
-
 (function byValueRefInt() {
   expectSuccess(function() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, Ref(int), [TestTrait], "ref");
-    print(r);
+    // FIXME incomplete
   });
 })();
 
+printSummary();

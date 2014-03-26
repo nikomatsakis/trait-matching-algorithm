@@ -46,13 +46,14 @@ Environment.prototype.snapshot = function() {
 };
 
 Environment.prototype.attempt = function(closure) {
-  // Execute `closure` provisionally; if `closure` returns false,
+  // Execute `closure` provisionally; if `closure` returns something false-y,
   // any bindings created will be undone
   var snapshot = this.snapshot();
-  if (closure())
-    return true;
+  var r = closure();
+  if (r)
+    return r;
   this.rollback(snapshot);
-  return false;
+  return r;
 };
 
 Environment.prototype.probe = function(closure) {

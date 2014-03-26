@@ -9,10 +9,12 @@ load("coherence.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt1", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrInt2", [], new TraitReference("ToStr", [], intType)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt1", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrInt2", [], new TraitReference("ToStr", [], intType)),
+      ]);
 
     var conflicts = coherenceCheck(program);
 
@@ -29,10 +31,12 @@ load("coherence.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrStr", [], new TraitReference("ToStr", [], strType)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrStr", [], new TraitReference("ToStr", [], strType)),
+      ]);
 
     var conflicts = coherenceCheck(program);
 
@@ -51,10 +55,12 @@ load("coherence.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrAny", [p0Def], new TraitReference("ToStr", [], p0Type)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrAny", [p0Def], new TraitReference("ToStr", [], p0Type)),
+      ]);
 
     var conflicts = coherenceCheck(program);
 
@@ -80,10 +86,12 @@ load("coherence.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrFoo", [TDef], new TraitReference("ToStr", [], TType)),
-      new Impl("ToStrBar", [UDef], new TraitReference("ToStr", [], UType)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrFoo", [TDef], new TraitReference("ToStr", [], TType)),
+        new Impl("ToStrBar", [UDef], new TraitReference("ToStr", [], UType)),
+      ]);
 
     var conflicts = coherenceCheck(program);
 
@@ -103,10 +111,12 @@ load("coherence.js");
 
     var env = new Environment();
 
-    var program = new Program([
-      new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
-      new Impl("ToStrAnyFoo", [p0Def], new TraitReference("ToStr", [], p0Type)),
-    ]);
+    var program = new Program(
+      [],
+      [
+        new Impl("ToStrInt", [], new TraitReference("ToStr", [], intType)),
+        new Impl("ToStrAnyFoo", [p0Def], new TraitReference("ToStr", [], p0Type)),
+      ]);
 
     var conflicts = coherenceCheck(program);
 

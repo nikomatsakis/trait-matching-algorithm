@@ -3,7 +3,7 @@
 // Requires: type.js
 
 function DEBUG() {
-  print.apply(null, arguments);
+  // print.apply(null, arguments);
 }
 
 ///////////////////////////////////////////////////////////////////////////
