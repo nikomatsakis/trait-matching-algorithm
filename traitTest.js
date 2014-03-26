@@ -139,8 +139,7 @@ load("trait.js");
       noImpl: []
     };
 
-    assertEq(JSON.stringify(expectedResult, undefined, 2),
-             JSON.stringify(result, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
   })
 })();
 
@@ -173,8 +172,7 @@ load("trait.js");
       noImpl: []
     };
 
-    assertEq(JSON.stringify(expectedResult, undefined, 2),
-             JSON.stringify(result, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
     assertEq(varType.isBound(),
              false);
   })
@@ -201,14 +199,13 @@ load("trait.js");
       ]);
 
     var expectedResult = {
-      confirmed: [{impl: "ToStrInt", obligation: "A"}],
+      confirmed: ["A -> ToStrInt<>"],
       deferred: [],
       overflow: [],
       noImpl: []
     };
 
-    assertEq(JSON.stringify(result, undefined, 2),
-             JSON.stringify(expectedResult, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
     assertEq(JSON.stringify(varType.resolve()),
              JSON.stringify(intType));
   })
@@ -241,14 +238,13 @@ load("trait.js");
       ]);
 
     var expectedResult = {
-      confirmed: [{impl: "IterableList", obligation: "A"}],
+      confirmed: ["A -> IterableList<${1:int}>"],
       deferred: [],
       overflow: [],
       noImpl: []
     };
 
-    assertEq(JSON.stringify(result, undefined, 2),
-             JSON.stringify(expectedResult, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
     assertEq(JSON.stringify(varType.resolve()),
              JSON.stringify(intType));
   })
@@ -287,8 +283,7 @@ load("trait.js");
       noImpl: []
     };
 
-    assertEq(JSON.stringify(result, undefined, 2),
-             JSON.stringify(expectedResult, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
     assertEq(varType.isBound(), false);
   })
 })();
@@ -319,23 +314,17 @@ load("trait.js");
       ]);
 
     var expectedResult = {
-      confirmed: [{impl:"ToStr",
-                   obligation:"A"},
-                  {impl:"ToStr",
-                   obligation:"A.0"},
-                  {impl:"ToStr",
-                   obligation:"A.0.0"},
-                  {impl:"ToStr",
-                   obligation:"A.0.0.0"},
-                  {impl:"ToStr",
-                   obligation:"A.0.0.0.0"}],
+      confirmed: ["A -> ToStr<${0:str}>",
+                  "A.0 -> ToStr<${1:str}>",
+                  "A.0.0 -> ToStr<${2:str}>",
+                  "A.0.0.0 -> ToStr<${3:str}>",
+                  "A.0.0.0.0 -> ToStr<${4:str}>"],
       deferred: [],
-      overflow: [{obligation:"A.0.0.0.0.0"}],
+      overflow: ["A.0.0.0.0.0"],
       noImpl: [],
     };
 
-    assertEq(JSON.stringify(result, undefined, 2),
-             JSON.stringify(expectedResult, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
   })
 })();
 
@@ -370,23 +359,17 @@ load("trait.js");
       ]);
 
     var expectedResult = {
-      confirmed: [{impl:"ToStr",
-                   obligation:"A"},
-                  {impl:"ToStr",
-                   obligation:"A.0"},
-                  {impl:"ToStr",
-                   obligation:"A.0.0"},
-                  {impl:"ToStr",
-                   obligation:"A.0.0.0"},
-                  {impl:"ToStr",
-                   obligation:"A.0.0.0.0"}],
+      confirmed: ["A -> ToStr<${0:str}>",
+                  "A.0 -> ToStr<${1:str}>",
+                  "A.0.0 -> ToStr<${2:str}>",
+                  "A.0.0.0 -> ToStr<${3:str}>",
+                  "A.0.0.0.0 -> ToStr<${4:str}>"],
       deferred: [],
-      overflow: [{obligation:"A.0.0.0.0.0"}],
+      overflow: ["A.0.0.0.0.0"],
       noImpl: [],
     };
 
-    assertEq(JSON.stringify(result, undefined, 2),
-             JSON.stringify(expectedResult, undefined, 2));
+    assertEq(JSON.stringify(expectedResult), result.toString());
   })
 })();
 
