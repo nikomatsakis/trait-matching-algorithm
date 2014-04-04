@@ -3,6 +3,10 @@
 // Requires: type.js
 // Requires: trait.js
 
+function MDEBUG() {
+  print.apply(null, arguments);
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // Some builtin types and the builtin deref traits
 
@@ -24,28 +28,64 @@ var DEREF_MUT_TRAIT = new Trait("DerefMut", [false, true], [
 ]);
 
 ///////////////////////////////////////////////////////////////////////////
-// Adjustments
+// Adjusted type
+//
+// As we process the method call, we will track the implicit
+// adjustments that we made to the receiver in order to make the types
+// line up.
+//
+// AT =          -> ty        // No adjustments applied
+//    |* imm AT  -> ty        // Applied imm deref trait to yield `ty`
+//    | * mut AT -> ty        // Applied mut deref trait to yield `ty`
+//    | & imm AT -> ty        // Took reference to yield `ty`
+//    | & mut AT -> ty        // Took mutable reference to yield `ty`
 //
 // Tracks the adjustment(s) that had to be applied to the receiver.
 
-function DerefAdjustment(traitName, resolveResults) {
-  this.traitName = traitName;
-  this.resolveResults = resolveResults;
+function Unadjusted(type) {
+  this.type = type;
 }
 
-DerefAdjustment.prototype.toString = function() {
-  return "DerefAdjustment(" + this.traitName + ")";
-};
-
-RefAdjustment = {
+Unadjusted.prototype = {
   toString: function() {
-    return "RefAdjustment()";
+    return this.type.toString();
   }
 };
 
-RefMutAdjustment = {
+function Dereferenced(input, traitRef, resolveResults) {
+  this.input = input;
+  this.type = traitRef.typeParameters[0];
+
+  this.traitRef = traitRef;
+  this.resolveResults = resolveResults;
+}
+
+Dereferenced.prototype = {
   toString: function() {
-    return "RefMutAdjustment()";
+    var mut = (this.traitRef.id == DEREF_MUT_TRAIT.id ? "mut" : "");
+    return "*" + mut + this.input;
+  }
+};
+
+function Referenced(input) {
+  this.input = input;
+  this.type = Ref(inputType);
+}
+
+Referenced.prototype = {
+  toString: function() {
+    return "&" + this.input;
+  }
+};
+
+function MutReferenced(input) {
+  this.input = input;
+  this.type = RefMut(inputType);
+}
+
+MutReferenced.prototype = {
+  toString: function() {
+    return "&mut" + this.input;
   }
 };
 
@@ -76,26 +116,17 @@ Ambiguous.prototype = {
   }
 };
 
-function Match(traitRef, adjustments, results) {
+function Match(traitRef, adjusted, results) {
   this.traitRef = traitRef;
-  this.adjustments = to_array(adjustments);
+  this.adjusted = adjusted;
   this.results = results;
-
-  function to_array(conslist) {
-    var x = [];
-    while (conslist) {
-      x.push(conslist[0]);
-      conslist = conslist[1];
-    }
-    return x;
-  }
 }
 
 Match.prototype = {
   success: true,
 
   toString: function() {
-    return "Match(" + this.adjustments + ", " + this.traitRef + ")";
+    return "Match(" + this.adjustment + ", " + this.traitRef + ")";
   }
 };
 
@@ -106,7 +137,7 @@ Match.prototype = {
 
 function resolveMethod(program, env, receiverType, traits, methodName) {
   var mcx = new MethodContext(program, env, traits, methodName);
-  return mcx.resolve([receiverType, null], null);
+  return mcx.resolve(new Unadjusted(receiverType));
 }
 
 function MethodContext(program, env, traits, methodName) {
@@ -117,14 +148,16 @@ function MethodContext(program, env, traits, methodName) {
 }
 
 MethodContext.prototype = {
-  resolve: function(types, adjustments) {
+  resolve: function(adjusted) {
+    MDEBUG("resolve", adjusted);
+
     // Resolves a method call `receiver.method(...)`, taking into
     // account auto-deref rules and so forth.
 
     // Filter out those traits that definitely cannot apply to `receiverType`.
     var applicableTraits = this.traits.filter(trait => {
       return trait.hasMethodNamed(this.methodName) && this.env.probe(() => {
-        var [_, results] = this.resolveMethodTrait(types[0], trait);
+        var [_, results] = this.resolveMethodTrait(adjusted, trait);
         var noImpl = results.noImpl;
         return noImpl.length === 0; // Keep if we cannot rule it out.
       });
@@ -132,7 +165,7 @@ MethodContext.prototype = {
 
     // No matching traits. Try dereferencing `receiverType` and search again.
     if (applicableTraits.length === 0) {
-      return this.resolveAfterDeref(types, adjustments);
+      return this.resolveAfterDeref(adjusted);
     }
 
     // Multiple potential matching traits.
@@ -147,33 +180,39 @@ MethodContext.prototype = {
     // some sort of functional dependency rule!
     assertEq(applicableTraits.length, 1);
     var trait = applicableTraits[0];
-    var [traitRef, results] = this.resolveMethodTrait(types[0], trait);
+    var [traitRef, results] = this.resolveMethodTrait(adjusted, trait);
     assertEq(results.noImpl.length, 0);
 
     // Now we must reconcile against the self type.
-    return new Match(traitRef, adjustments, results);
+    return new Match(traitRef, adjusted, results);
   },
 
-  resolveAfterDeref: function(types, adjustments) {
-    var [t, a] = this.tryDeref(types[0]);
-    if (t == null)
-      return new CannotDeref(types[0]);
+  resolveAfterDeref: function(adjusted) {
+    MDEBUG("resolveAfterDeref", adjusted);
 
-    return this.resolve([t, types], [a, adjustments]);
+    var dereferenced = this.tryDeref(adjusted);
+    if (dereferenced == null)
+      return new CannotDeref(adjusted.type);
+
+    return this.resolve(dereferenced);
   },
 
-  resolveMethodTrait: function(selfType, trait) {
-    var traitRef = trait.freshReference(this.env, selfType);
+  resolveMethodTrait: function(adjusted, trait) {
+    MDEBUG("resolveMethodTrait", adjusted, trait);
+
+    var traitRef = trait.freshReference(this.env, adjusted.type);
     var obligation = new Obligation("method", traitRef, 0);
     return [traitRef, resolve(this.program, this.env, [obligation])];
   },
 
-  tryDeref: function(selfType) {
-    var traitRef = DEREF_TRAIT.freshReference(this.env, selfType);
+  tryDeref: function(adjusted) {
+    MDEBUG("tryDeref", adjusted);
+
+    var traitRef = DEREF_TRAIT.freshReference(this.env, adjusted.type);
     var obligation = new Obligation("deref", traitRef, 0);
     var results = resolve(this.program, this.env, [obligation]);
 
-    // Deref trait *definitely* definitely not implemented:
+    // Deref trait *definitely* not implemented:
     if (results.noImpl.length !== 0)
       return [null, null];
 
@@ -192,33 +231,40 @@ MethodContext.prototype = {
     // receiver, in which case we will autoref. No prob.
 
     // NB -- Again here, given fundeps, coherence guarantees us a unique impl
-    var derefdType = traitRef.typeParameters[0];
-    return [derefdType, new DerefAdjustment(DEREF_TRAIT.id, derefdType)];
+    return new Dereferenced(adjusted, traitRef, results);
   },
 
-  reconcileSelfType: function(adjustments, types, methodDecl, traitRef, results) {
-    print("reconcileSelfType", adjustments, types, methodDecl, traitRef);
+  reconcileSelfType: function(adjusted, methodDecl, traitRef, results) {
+    MDEBUG("reconcileSelfType", adjusted, types, methodDecl, traitRef);
+
     var selfType = methodDecl.selfType.subst(traitRef.typeParameters);
-    print("selfType", selfType);
+
+    MDEBUG("selfType", selfType);
 
     // Check whether the type T works; if so, we know what adjustments
     // were needed.
-    if (env.attempt(() => selfType.unify(types[0])))
+    if (env.attempt(() => selfType.unify(adjusted.type)))
       return new Match(traitRef, adjustments, results);
 
     // Attempt an &ref.
-    var refType = Ref(types[0]);
+    var refType = Ref(adjusted.type);
     if (env.attempt(() => selfType.unify(refType)))
-      return new Match(traitRef, [RefAdjustment, adjustments], results);
+      return new Match(traitRef, RefAdjustment(adjustment), results);
 
     // Attempt an &mut ref.
-    var refMutType = RefMut(types[0]);
+    var refMutType = RefMut(adjusted.type);
     if (env.attempt(() => selfType.unify(refMutType))) {
-      var mutAdjustments = this.makeMutable(adjustments);
-      return new Match(traitRef, [RefMutAdjustment, mutAdjustments], results);
+      var mutAdjusted = this.makeMutable(adjusted);
+      return new Match(traitRef, RefMutAdjustment(mutAdjusted), results);
     }
   },
 
-  makeMutable: function(adjustments, types) {
-  }
+  makeMutable: function(adjustments) {
+    if (adjustments === null)
+      return null;
+    var adjustment = adjustments[0];
+    assertEq(adjustment instanceof DerefAdjustment, true);
+    var mutableAdjustment = adjustment.makeMutable();
+    return [mutableAdjustment, this.makeMutable(adjustments[1])];
+  },
 };

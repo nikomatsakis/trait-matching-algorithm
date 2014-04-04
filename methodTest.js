@@ -93,7 +93,7 @@ function setup() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, int, [TestTrait], "val");
     assertEq(r.success, true);
-    assertEq(r.adjustments.length, 0);
+    assertEq(r.adjusted.toString(), "int");
     assertEq(r.traitRef.toString(), "Test<for int>");
   });
 })();
@@ -103,8 +103,7 @@ function setup() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, Ref(int), [TestTrait], "val");
     assertEq(r.success, true);
-    assertEq(r.adjustments.length, 1);
-    assertEq(r.adjustments.toString(), "DerefAdjustment(Deref)");
+    assertEq(r.adjusted.toString(), "*Ref<int>");
     assertEq(r.traitRef.toString(), "Test<for ${0:int}>");
   });
 })();
@@ -113,6 +112,7 @@ function setup() {
   expectSuccess(function() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, Ref(int), [TestTrait], "ref");
+    print(JSON.stringify(r));
     // FIXME incomplete
   });
 })();
