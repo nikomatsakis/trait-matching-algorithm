@@ -28,14 +28,20 @@ Environment.prototype.unifyTraitReferences = function(traitRef1, traitRef2) {
   if (!this.unify(traitRef1.selfType, traitRef2.selfType))
     return false;
 
+  DEBUG("unified", traitRef1.selfType, traitRef2.selfType);
+
   var numTypeParameters = traitRef1.typeParameters.length;
   if (numTypeParameters != traitRef2.typeParameters.length)
     throw new Error("Inconsistent number of type parameters: " +
                     traitRef1 + " vs " + traitRef2);
 
-  for (var k = 0; k < numTypeParameters; k++)
+  for (var k = 0; k < numTypeParameters; k++) {
     if (!this.unify(traitRef1.typeParameters[k], traitRef2.typeParameters[k]))
       return false;
+    DEBUG("unified",
+          traitRef1.typeParameters[k],
+          traitRef2.typeParameters[k]);
+  }
 
   return true;
 }

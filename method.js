@@ -43,6 +43,7 @@ var DEREF_MUT_TRAIT = new Trait("DerefMut", [false, true], [
 // Tracks the adjustment(s) that had to be applied to the receiver.
 
 function Unadjusted(type) {
+  this.input = null;
   this.type = type;
 }
 
@@ -110,6 +111,19 @@ CannotDeref.prototype = {
   }
 };
 
+function CannotReconcileSelfType(selfType, traitRef) {
+  this.selfType = selfType;
+  this.traitRef = traitRef;
+}
+
+CannotReconcileSelfType.prototype = {
+  success: false,
+
+  toString: function() {
+    return "CannotReconcileSelfType(" + this.selfType + ", " + this.traitRef + ")";
+  }
+};
+
 function CannotRefMut(adjusted) {
   this.adjusted = adjusted;
 }
@@ -147,8 +161,6 @@ Match.prototype = {
     return "Match(" + this.adjusted + ", " + this.traitRef + ")";
   }
 };
-
-///////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////
 //
@@ -225,11 +237,13 @@ MethodContext.prototype = {
   },
 
   tryDeref: function(adjusted, trait) {
-    MDEBUG("tryDeref", adjusted, trait.id);
+    MDEBUG("tryDeref", adjusted, adjusted.type, trait.id);
 
     var traitRef = trait.freshReference(this.env, adjusted.type);
     var obligation = new Obligation("deref", traitRef, 0);
     var results = resolve(this.program, this.env, [obligation]);
+
+    MDEBUG("results", results);
 
     // Deref trait *definitely* not implemented:
     if (results.noImpl.length !== 0)
@@ -280,6 +294,14 @@ MethodContext.prototype = {
 
       return new Match(traitRef, new MutReferenced(mutAdjusted), results);
     }
+
+    // Peel back a layer and try again.
+    if (adjusted.input)
+      return this.reconcileSelfType(adjusted.input, methodDecl,
+                                    traitRef, results);
+
+    // Otherwise, well, it just can't be done.
+    return new CannotReconcileSelfType(selfType, traitRef);
   },
 };
 

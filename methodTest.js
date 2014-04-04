@@ -74,13 +74,14 @@ function setup() {
       "Test"
     ],
     [
-      ImplDerefForHeap, ImplDerefForGc, ImplDerefForGc,
+      ImplDerefForHeap, ImplDerefForGc,
       ImplDerefForRef, ImplDerefForRefMut,
       ImplDerefMutForHeap, ImplDerefMutForRefMut,
       ImplTestForInt
     ]);
 
   return {int: int,
+          Gc: Gc,
           Heap: Heap,
           env: env,
           program: program,
@@ -138,6 +139,22 @@ function setup() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, Heap(int), [TestTrait], "ref_mut");
     assertEq(r.toString(), "Match(&mut *mut Heap<int>, Test<for ${0:int}>)");
+  });
+})();
+
+(function byGcHeapInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Heap} = setup();
+    var r = resolveMethod(program, env, Heap(int), [TestTrait], "gc");
+    assertEq(r.toString(), "CannotReconcileSelfType(Gc<${0:int}>, Test<for ${0:int}>)");
+  });
+})();
+
+(function byGcRefGcInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Gc, Heap} = setup();
+    var r = resolveMethod(program, env, Ref(Gc(int)), [TestTrait], "gc");
+    assertEq(r.toString(), "Match(*Ref<Gc<int>>, Test<for ${2:int}>)");
   });
 })();
 

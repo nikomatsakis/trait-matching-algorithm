@@ -3,7 +3,7 @@
 // Requires: type.js
 
 function DEBUG() {
-  // print.apply(null, arguments);
+  //print.apply(null, arguments);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -20,6 +20,10 @@ function Trait(id, fundeps, methods) {
   this.arity = fundeps.length; // number of type parameters
   this.methods = methods; // [Method]
 }
+
+Trait.prototype.toString = function() {
+  return "[trait " + this.id + "]";
+};
 
 Trait.prototype.param_is_input = function(i) {
   // True if param #i is an "input"
