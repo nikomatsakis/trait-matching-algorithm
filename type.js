@@ -127,8 +127,10 @@ Type.prototype.resolve = function() {
   return new Type(this.id, this.typeParameters.map(p => p.resolve()));
 };
 
-Type.prototype.subst = function(replacements) {
-  return new Type(this.id, this.typeParameters.map(p => p.subst(replacements)));
+Type.prototype.subst = function(replacements, selfReplacement) {
+  return new Type(this.id,
+                  this.typeParameters.map(
+                    p => p.subst(replacements, selfReplacement)));
 };
 
 Type.prototype.meetsNominalPredicate = function(predicate) {
@@ -148,6 +150,32 @@ function TypeParameterDef(index, bounds) {
 
 TypeParameterDef.prototype.toString = function() {
   return "<" + ALPHABET[this.index] + ":" + this.bounds + ">";
+};
+
+///////////////////////////////////////////////////////////////////////////
+
+TypeParameterSelf = {
+  toString: function() {
+    return "Self";
+  },
+
+  unify: function() {
+    throw new Error("Unsubstituted type parameter: " + this);
+  },
+
+  unifyWithType: function() {
+    throw new Error("Unsubstituted type parameter: " + this);
+  },
+
+  unifyWithUnboundTypeVariable: function() {
+    throw new Error("Unsubstituted type parameter: " + this);
+  },
+
+  subst: function(replacements, selfReplacement) {
+    assertEq(selfReplacement !== null, true);
+    return selfReplacement;
+  },
+
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -173,7 +201,7 @@ TypeParameter.prototype.unifyWithUnboundTypeVariable = function(environment, var
   throw new Error("Unsubstituted type parameter: " + this);
 };
 
-TypeParameter.prototype.subst = function(replacements) {
+TypeParameter.prototype.subst = function(replacements, selfReplacement) {
   return replacements[this.index];
 };
 
@@ -236,7 +264,7 @@ TypeVariable.prototype.toString = function() {
   return "${"+this.index+":"+this.value+"}";
 };
 
-TypeVariable.prototype.subst = function(replacements) {
+TypeVariable.prototype.subst = function(replacements, selfReplacement) {
   throw new Error("Substituting type variable: " + this);
 };
 

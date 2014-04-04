@@ -48,6 +48,12 @@ function Method(id, selfType) {
   this.selfType = selfType; // Type referencing the `Self` type parameter
 }
 
+Method.prototype = {
+  toString: function() {
+    return this.id + "(self: " + this.selfType + ", ...) -> ...";
+  }
+};
+
 ///////////////////////////////////////////////////////////////////////////
 // An Obligation indicates a trait reference that must be resolved to
 // an impl. So, for example, if the user uses calls `show(x)` where
@@ -319,7 +325,7 @@ function instantiateAndUnify(environment, impl, pendingTraitReference) {
   //    Theta TypeP == TypeQ && Theta TypeS == TypeT
 
   var freshVariables = environment.freshVariables(impl.numVariables);
-  var implTraitReference = impl.traitReference.subst(freshVariables);
+  var implTraitReference = impl.traitReference.subst(freshVariables, null);
 
   DEBUG("freshVariables", freshVariables);
   DEBUG("implTraitReference", implTraitReference);
@@ -339,7 +345,7 @@ function implObligations(base_id, depth, impl, replacements) {
   var obligations = [];
   impl.parameterDefs.forEach(parameterDef => {
     parameterDef.bounds.forEach((bound, index) => {
-      var bound = bound.subst(replacements);
+      var bound = bound.subst(replacements, null);
       obligations.push(new Obligation(base_id+"."+index, bound, depth));
     });
   });

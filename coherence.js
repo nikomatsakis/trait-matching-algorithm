@@ -42,9 +42,9 @@ function implCanSatisfy(program, implI, implJ) {
 
   // first, instantiate fresh variables for each impl's type parameters
   var variablesI = env.freshVariables(implI.parameterDefs.length);
-  var traitReferenceI = implI.traitReference.subst(variablesI);
+  var traitReferenceI = implI.traitReference.subst(variablesI, null);
   var variablesJ = env.freshVariables(implJ.parameterDefs.length);
-  var traitReferenceJ = implJ.traitReference.subst(variablesJ);
+  var traitReferenceJ = implJ.traitReference.subst(variablesJ, null);
 
   // check whether the types in the two trait refs can be unified
   if (!env.unifyTraitReferences(traitReferenceI, traitReferenceJ))
@@ -61,10 +61,10 @@ function implCanSatisfy(program, implI, implJ) {
 
 function substCouldSatisfyImplBounds(program, env, impl, variables) {
   var obligations = [];
-  var traitReference = impl.traitReference.subst(variables);
+  var traitReference = impl.traitReference.subst(variables, null);
   impl.parameterDefs.forEach((parameterDef, parameterIndex) => {
     parameterDef.bounds.forEach((bound, boundIndex) => {
-      bound = bound.subst(variables);
+      bound = bound.subst(variables, null);
       obligations.push(new Obligation("[P=" + parameterIndex + "," +
                                       "B=" + boundIndex + "]",
                                       bound,

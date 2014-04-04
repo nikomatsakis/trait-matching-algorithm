@@ -53,13 +53,12 @@ function setup() {
   //   fn heap(Heap<Self>);
   //   fn gc(Gc<Self>);
   // }
-  var TestSelf = new TypeParameter(0);
   var TestTrait = new Trait("Test", [true], [
-    new Method("val", TestSelf),
-    new Method("ref", Ref(TestSelf)),
-    new Method("ref_mut", RefMut(TestSelf)),
-    new Method("heap", Heap(TestSelf)),
-    new Method("gc", Gc(TestSelf)),
+    new Method("val", TypeParameterSelf),
+    new Method("ref", Ref(TypeParameterSelf)),
+    new Method("ref_mut", RefMut(TypeParameterSelf)),
+    new Method("heap", Heap(TypeParameterSelf)),
+    new Method("gc", Gc(TypeParameterSelf)),
   ]);
 
   // impl Test for int
@@ -108,12 +107,37 @@ function setup() {
   });
 })();
 
-(function byValueRefInt() {
+(function byRefRefInt() {
   expectSuccess(function() {
     var {env, program, int, TestTrait, Heap} = setup();
     var r = resolveMethod(program, env, Ref(int), [TestTrait], "ref");
-    print(JSON.stringify(r));
-    // FIXME incomplete
+    assertEq(r.success, true);
+    assertEq(r.adjusted.toString(), "&*Ref<int>");
+    assertEq(r.traitRef.toString(), "Test<for ${0:int}>");
+  });
+})();
+
+(function byMutRefRefInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Heap} = setup();
+    var r = resolveMethod(program, env, Ref(int), [TestTrait], "ref_mut");
+    assertEq(r.toString(), "CannotRefMut(*Ref<int>)");
+  });
+})();
+
+(function byMutRefInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Heap} = setup();
+    var r = resolveMethod(program, env, int, [TestTrait], "ref_mut");
+    assertEq(r.toString(), "Match(&mut int, Test<for int>)");
+  });
+})();
+
+(function byMutRefInt() {
+  expectSuccess(function() {
+    var {env, program, int, TestTrait, Heap} = setup();
+    var r = resolveMethod(program, env, Heap(int), [TestTrait], "ref_mut");
+    assertEq(r.toString(), "Match(&mut *mut Heap<int>, Test<for ${0:int}>)");
   });
 })();
 

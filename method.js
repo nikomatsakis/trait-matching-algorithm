@@ -4,7 +4,7 @@
 // Requires: trait.js
 
 function MDEBUG() {
-  print.apply(null, arguments);
+  //print.apply(null, arguments);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -61,15 +61,21 @@ function Dereferenced(input, traitRef, resolveResults) {
 }
 
 Dereferenced.prototype = {
+  isMutable: function() {
+    return this.traitRef.id === DEREF_MUT_TRAIT.id;
+  },
+
   toString: function() {
-    var mut = (this.traitRef.id == DEREF_MUT_TRAIT.id ? "mut" : "");
-    return "*" + mut + this.input;
+    if (this.isMutable())
+      return "*mut " + this.input.toString();
+    else
+      return "*" + this.input.toString();
   }
 };
 
 function Referenced(input) {
   this.input = input;
-  this.type = Ref(inputType);
+  this.type = Ref(input.type);
 }
 
 Referenced.prototype = {
@@ -80,12 +86,12 @@ Referenced.prototype = {
 
 function MutReferenced(input) {
   this.input = input;
-  this.type = RefMut(inputType);
+  this.type = RefMut(input.type);
 }
 
 MutReferenced.prototype = {
   toString: function() {
-    return "&mut" + this.input;
+    return "&mut " + this.input;
   }
 };
 
@@ -101,6 +107,18 @@ CannotDeref.prototype = {
 
   toString: function() {
     return "CannotDeref(" + this.type + ")";
+  }
+};
+
+function CannotRefMut(adjusted) {
+  this.adjusted = adjusted;
+}
+
+CannotRefMut.prototype = {
+  success: false,
+
+  toString: function() {
+    return "CannotRefMut(" + this.adjusted + ")";
   }
 };
 
@@ -126,7 +144,7 @@ Match.prototype = {
   success: true,
 
   toString: function() {
-    return "Match(" + this.adjustment + ", " + this.traitRef + ")";
+    return "Match(" + this.adjusted + ", " + this.traitRef + ")";
   }
 };
 
@@ -184,13 +202,14 @@ MethodContext.prototype = {
     assertEq(results.noImpl.length, 0);
 
     // Now we must reconcile against the self type.
-    return new Match(traitRef, adjusted, results);
+    var methodDecl = trait.methodNamed(this.methodName);
+    return this.reconcileSelfType(adjusted, methodDecl, traitRef, results);
   },
 
   resolveAfterDeref: function(adjusted) {
     MDEBUG("resolveAfterDeref", adjusted);
 
-    var dereferenced = this.tryDeref(adjusted);
+    var dereferenced = this.tryDeref(adjusted, DEREF_TRAIT);
     if (dereferenced == null)
       return new CannotDeref(adjusted.type);
 
@@ -205,20 +224,20 @@ MethodContext.prototype = {
     return [traitRef, resolve(this.program, this.env, [obligation])];
   },
 
-  tryDeref: function(adjusted) {
-    MDEBUG("tryDeref", adjusted);
+  tryDeref: function(adjusted, trait) {
+    MDEBUG("tryDeref", adjusted, trait.id);
 
-    var traitRef = DEREF_TRAIT.freshReference(this.env, adjusted.type);
+    var traitRef = trait.freshReference(this.env, adjusted.type);
     var obligation = new Obligation("deref", traitRef, 0);
     var results = resolve(this.program, this.env, [obligation]);
 
     // Deref trait *definitely* not implemented:
     if (results.noImpl.length !== 0)
-      return [null, null];
+      return null;
 
     // Deref trait not known to be implemented:
     if (results.confirmed.length === 0)
-      return [null, null];
+      return null;
 
     // NB. I am going from (e.g.) `GC<T>` to `T`, when in fact the
     // deref methods returns `&T`. I think that as far as logic goes,
@@ -235,36 +254,57 @@ MethodContext.prototype = {
   },
 
   reconcileSelfType: function(adjusted, methodDecl, traitRef, results) {
-    MDEBUG("reconcileSelfType", adjusted, types, methodDecl, traitRef);
+    MDEBUG("reconcileSelfType", adjusted, methodDecl, traitRef);
 
-    var selfType = methodDecl.selfType.subst(traitRef.typeParameters);
+    var selfType = methodDecl.selfType.subst(traitRef.typeParameters,
+                                             traitRef.selfType);
 
     MDEBUG("selfType", selfType);
 
     // Check whether the type T works; if so, we know what adjustments
     // were needed.
-    if (env.attempt(() => selfType.unify(adjusted.type)))
-      return new Match(traitRef, adjustments, results);
+    if (this.env.attempt(() => selfType.unify(this.env, adjusted.type)))
+      return new Match(traitRef, adjusted, results);
 
     // Attempt an &ref.
     var refType = Ref(adjusted.type);
-    if (env.attempt(() => selfType.unify(refType)))
-      return new Match(traitRef, RefAdjustment(adjustment), results);
+    if (this.env.attempt(() => selfType.unify(this.env, refType)))
+      return new Match(traitRef, new Referenced(adjusted), results);
 
     // Attempt an &mut ref.
     var refMutType = RefMut(adjusted.type);
-    if (env.attempt(() => selfType.unify(refMutType))) {
-      var mutAdjusted = this.makeMutable(adjusted);
-      return new Match(traitRef, RefMutAdjustment(mutAdjusted), results);
+    if (this.env.attempt(() => selfType.unify(this.env, refMutType))) {
+      var mutAdjusted = adjusted.makeMutable(this);
+      if (!mutAdjusted)
+        return new CannotRefMut(adjusted);
+
+      return new Match(traitRef, new MutReferenced(mutAdjusted), results);
     }
   },
+};
 
-  makeMutable: function(adjustments) {
-    if (adjustments === null)
-      return null;
-    var adjustment = adjustments[0];
-    assertEq(adjustment instanceof DerefAdjustment, true);
-    var mutableAdjustment = adjustment.makeMutable();
-    return [mutableAdjustment, this.makeMutable(adjustments[1])];
-  },
+Unadjusted.prototype.makeMutable = function(mcx) {
+  return this;
+};
+
+Dereferenced.prototype.makeMutable = function(mcx) {
+  if (this.isMutable())
+    return this;
+
+  var mutInput = this.input.makeMutable(mcx);
+  if (!mutInput)
+    return null;
+
+  return mcx.tryDeref(mutInput, DEREF_MUT_TRAIT);
+};
+
+Referenced.prototype.makeMutable = function(mcx) {
+  var mutInput = this.input.makeMutable(mcx);
+  if (!mutInput)
+    return null;
+  return MutReferenced(mutInput);
+};
+
+MutReferenced.prototype.makeMutable = function(mcx) {
+  return this;
 };
