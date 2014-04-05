@@ -163,12 +163,25 @@ Match.prototype = {
 };
 
 ///////////////////////////////////////////////////////////////////////////
+// resolveMethod() -- the outermost method resolution function.
 //
+// - `program` -- the traits and impls
+// - `env` -- a typing environment
+// - `receiverType` -- the type of the method receiver (i.e., `a` in
+//   `a.m(...)`). Note that method resolution always proceeds without
+//   considering the types of the arguments.
+// - `traits` -- the list of traits that are in scope
+// - `methodName` -- the name of the method being called
+//   (i.e., `m` in `a.m(...)`)
 
 function resolveMethod(program, env, receiverType, traits, methodName) {
   var mcx = new MethodContext(program, env, traits, methodName);
   return mcx.resolve(new Unadjusted(receiverType));
 }
+
+///////////////////////////////////////////////////////////////////////////
+// MethodContext -- this class just lumps together the various bits of
+// state involved in method resolution
 
 function MethodContext(program, env, traits, methodName) {
   this.program = program;
@@ -270,6 +283,17 @@ MethodContext.prototype = {
     return new Dereferenced(adjusted, traitRef, results);
   },
 
+  // After a trait has been selected, we must determine whether we can
+  // *reconcile* the receiver type with the self type. This basically
+  // involves removing some of the autoderefs we used and possibly
+  // inserting some autorefs. For example, imagine there was a
+  // receiver of type `&GC<T>` and we invoked a `self: &Self` method
+  // defined on an `impl Trait for T`. In that case, we'd have
+  // autoderef'd twice to get from `&GC<T>` to `T`. Now we have to get
+  // from `T` to `&T`, because of the receiver type. To do that, we
+  // would insert an autoref.  If the method had however been a `self:
+  // GC<Self>` method, then we would have removed one autoderef to get
+  // back to `GC<T>`, and we're done.
   reconcileSelfType: function(adjusted, methodDecl, traitRef, results) {
     MDEBUG("reconcileSelfType", adjusted, methodDecl, traitRef);
 
