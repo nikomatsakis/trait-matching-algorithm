@@ -4,7 +4,7 @@
 // Requires: trait.js
 
 function MDEBUG() {
-  //print.apply(null, arguments);
+//  print.apply(null, arguments);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -17,14 +17,14 @@ var Ref = t => new Type("Ref", [t]);
 var RefMut = t => new Type("RefMut", [t]);
 
 // trait Deref<A> { fn deref<'a>(&'a mut self) -> &'a mut A }
-var DEREF_TRAIT = new Trait("Deref", [false, true], [
-  new Method("deref", Ref(new TypeParameter(1)))
+var DEREF_TRAIT = new Trait("Deref", [false], [
+  new Method("deref", Ref(TypeParameterSelf))
 ]);
 
 
 // trait DerefMut<A> { fn deref_mut<'a>(&'a mut self) -> &'a mut A }
-var DEREF_MUT_TRAIT = new Trait("DerefMut", [false, true], [
-  new Method("deref_mut", Ref(TypeParameter(1)))
+var DEREF_MUT_TRAIT = new Trait("DerefMut", [false], [
+  new Method("deref_mut", Ref(TypeParameterSelf))
 ]);
 
 ///////////////////////////////////////////////////////////////////////////
@@ -144,7 +144,7 @@ Ambiguous.prototype = {
   success: false,
 
   toString: function() {
-    return "Ambiguous(" + this.applicableTraits + ")";
+    return "Ambiguous(" + this.applicableTraits.map(t => t.id) + ")";
   }
 };
 
@@ -193,6 +193,8 @@ MethodContext.prototype = {
       });
     });
 
+    MDEBUG("applicableTraits: ", applicableTraits);
+
     // No matching traits. Try dereferencing `receiverType` and search again.
     if (applicableTraits.length === 0) {
       return this.resolveAfterDeref(adjusted);
@@ -240,6 +242,7 @@ MethodContext.prototype = {
     MDEBUG("tryDeref", adjusted, adjusted.type, trait.id);
 
     var traitRef = trait.freshReference(this.env, adjusted.type);
+    MDEBUG("traitRef", traitRef);
     var obligation = new Obligation("deref", traitRef, 0);
     var results = resolve(this.program, this.env, [obligation]);
 

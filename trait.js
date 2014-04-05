@@ -3,16 +3,13 @@
 // Requires: type.js
 
 function DEBUG() {
-  //print.apply(null, arguments);
+//  print.apply(null, arguments);
 }
 
 ///////////////////////////////////////////////////////////////////////////
 // Trait -- definition of a trait. For our purposes, we only care about
-// the name, arity, and list of methods.
-//
-// NB: The implicit `Self` type parameter is considered to be #arity.
-// In other words, if we have: `trait Foo<A,B>` then parameter 0 is A,
-// parameter 1 is B, and parameter 2 is Self.
+// the name, arity, and list of methods. Arity is the number of EXPLICIT
+// type parameters, `Self` is not counted.
 
 function Trait(id, fundeps, methods) {
   this.id = id; // trait name, a string
@@ -31,7 +28,7 @@ Trait.prototype.param_is_input = function(i) {
 };
 
 Trait.prototype.freshReference = function(env, selfType) {
-  var parameters = env.freshVariables(this.arity - 1);
+  var parameters = env.freshVariables(this.arity);
   return new TraitReference(this.id, parameters, selfType);
 };
 
